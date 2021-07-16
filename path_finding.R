@@ -1,43 +1,10 @@
-system.time({
-  street_graph <- build_graph_from_streets(
-    melb_lines$geometry, 
-    grepl(x = melb_lines$other_tags, 
-          pattern = "\"oneway\"=>\"yes\"")
-  )
-})
-
-# a_star_pathfinding <- function(start, end, graph, coordinates) {
-#   compute_cost <- function(a, cost_to_a, prev = NULL) {
-#     h <- manhattan(coordinates[a, ], coordinates[end, ])
-#     g <- cost_to_a
-#     f <- h + g
-#     list(id = a, h = h, g = g, f = f, prev = prev)
-#   }
-#   
-#   open <- list()
-#   close <- list()
-# 
-#   current <- compute_cost(start, 0)
-#   while (current$id != end) {
-#     for (vertex in get_adjacent(current$id, graph)) {
-#       if (not_in(vertex, open) && not_in(vertex, close)) {
-#         cost_to_vertex <- dist(coordinates[current$id, ],
-#                                coordinates[vertex, ])
-#         open <- append(open, compute_cost(vertex, cost_to_vertex, current$id))
-#         if ()
-#       }
-#     }
-#   }
-# }
-# 
-# print_node <- function(x) {
-#   cat("%d | %d | %d | %d | %d", node$id, node$g, node$h, node$f, 
-#       ifelse(is.null(node$prev), -1, node$prev)
-# }
-# 
-# not_in <- function(a, bs) {
-#   !(a %in% purrr::map_dbl(bs, ~.x$id))
-# }
+# system.time({
+#   street_graph <- build_graph_from_streets(
+#     melb_lines$geometry,
+#     grepl(x = melb_lines$other_tags,
+#           pattern = "\"oneway\"=>\"yes\"")
+#   )
+# })
 
 source("queue.R")
 
@@ -47,11 +14,18 @@ dist <- \(x, y) sqrt(sum((x - y)^2))
 
 manhattan <- \(x, y) sum(abs(x - y))
 
-get_adjacent <- \(x, graph) graph[graph$from == x, ]$to  
-
 a_star_pathfinding <- function(start, end, graph, coordinates) {
   heuristic <- \(a, b) manhattan(coordinates[a, ], coordinates[b, ])
   graph_cost <- \(a, b) dist(coordinates[a, ], coordinates[b, ])
+
+  g_sorted <- graph |> arrange(from)
+  counts <- g_sorted %>% group_by(from) %>% summarise(count = n())
+  order_hashmap <- cumsum(counts$count)
+  get_adjacent <- function(x) {
+    if (x == 1) return(1:order_hashmap[x])
+    adja_rows <- (order_hashmap[x-1] + 1):order_hashmap[x]
+    g_sorted[adja_rows, ]
+  }
   
   frontier <- PriorityQueue()
   frontier$put(start, 0)
@@ -66,7 +40,7 @@ a_star_pathfinding <- function(start, end, graph, coordinates) {
     if (current == end) 
       break
     
-    for (next_entry in get_adjacent(current, graph)) {
+    for (next_entry in get_adjacent(current)) {
       new_cost <- cost_so_far[[Char(current)]] + graph_cost(current, next_entry)
       if (!Char(next_entry) %in% names(cost_so_far) ||
           new_cost < cost_so_far[[Char(next_entry)]]) {
@@ -76,10 +50,11 @@ a_star_pathfinding <- function(start, end, graph, coordinates) {
         came_from[[Char(next_entry)]] <- current
       }
     }
-    print(frontier$length())
+    if (frontier$length() > 1000) break
   }
   
-  list(path = reconstruct_path(came_from), cost = cost_so_far)
+  # list(path = reconstruct_path(came_from, start, end), 
+  #      cost = cost_so_far)
 }
 
 
@@ -94,3 +69,19 @@ reconstruct_path <- function(came_from, start, end) {
   rev(path)
 }
 
+
+# profvis::profvis({path <- a_star_pathfinding(14, 4, street_graph$graph, nodes)})
+ 
+# get_adjacent <- \(x, graph) graph[graph[, 1] == x, 2]
+# tmp <- as.matrix(street_graph$graph)
+# profvis::profvis({path <- a_star_pathfinding(14, 4, tmp, nodes)})
+
+
+# g <- street_graph$graph
+# gm <- as.matrix(g)
+# g_sorted <- g |> arrange(from)
+# microbenchmark::microbenchmark(
+#   g[g$from == 111, ]$to, 
+#   gm[gm[, 1] == 111, 2],
+#   g_sorted[g_sorted$from == 111, ]$to
+# )
