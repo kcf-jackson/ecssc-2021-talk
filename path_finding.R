@@ -1,12 +1,14 @@
-# system.time({
-#   street_graph <- build_graph_from_streets(
-#     melb_lines$geometry,
-#     grepl(x = melb_lines$other_tags,
-#           pattern = "\"oneway\"=>\"yes\"")
-#   )
-# })
+source("streets_to_graph.R")
+system.time({
+  street_graph <- build_graph_from_streets(
+    melb_lines$geometry,
+    grepl(x = melb_lines$other_tags,
+          pattern = "\"oneway\"=>\"yes\"")
+  )
+})
 
 source("queue.R")
+source("binary_search.R")
 
 Char <- as.character
 
@@ -14,17 +16,34 @@ dist <- \(x, y) sqrt(sum((x - y)^2))
 
 manhattan <- \(x, y) sum(abs(x - y))
 
-a_star_pathfinding <- function(start, end, graph, coordinates) {
-  heuristic <- \(a, b) manhattan(coordinates[a, ], coordinates[b, ])
-  graph_cost <- \(a, b) dist(coordinates[a, ], coordinates[b, ])
-
+adjacent_cache <- function(graph) {
   g_sorted <- graph |> arrange(from)
   counts <- g_sorted %>% group_by(from) %>% summarise(count = n())
   order_hashmap <- cumsum(counts$count)
+  
   get_adjacent <- function(x) {
-    if (x == 1) return(1:order_hashmap[x])
-    adja_rows <- (order_hashmap[x-1] + 1):order_hashmap[x]
-    g_sorted[adja_rows, ]
+    index <- binary_search(x, counts$from)
+    if (index == -1) {
+      return(numeric(0))
+    } else if (index == 1) {
+      adja_rows <- 1:order_hashmap[index]
+    } else {
+      adja_rows <- (order_hashmap[index-1] + 1):order_hashmap[index]
+    }
+    g_sorted[adja_rows, ]$to
+  }
+  
+  return(get_adjacent)
+}
+
+a_star_pathfinding <- function(start, end, graph, get_adjacent) {
+  coordinates <- graph$nodes
+    
+  heuristic <- \(a, b) manhattan(coordinates[a, ], coordinates[b, ])
+  graph_cost <- \(a, b) dist(coordinates[a, ], coordinates[b, ])
+
+  if (missing(get_adjacent)) {
+    get_adjacent <- adjacent_cache(graph)
   }
   
   frontier <- PriorityQueue()
@@ -33,13 +52,14 @@ a_star_pathfinding <- function(start, end, graph, coordinates) {
   cost_so_far <- list()
   came_from[[Char(start)]] <- NA
   cost_so_far[[Char(start)]] <- 0
-  
+
   while (frontier$length() > 0) {
     current <- frontier$get()
     
     if (current == end) 
       break
     
+    # debug(get_adjacent)    
     for (next_entry in get_adjacent(current)) {
       new_cost <- cost_so_far[[Char(current)]] + graph_cost(current, next_entry)
       if (!Char(next_entry) %in% names(cost_so_far) ||
@@ -50,11 +70,11 @@ a_star_pathfinding <- function(start, end, graph, coordinates) {
         came_from[[Char(next_entry)]] <- current
       }
     }
-    if (frontier$length() > 1000) break
+    if (frontier$length() > 10000) browser()
   }
   
-  # list(path = reconstruct_path(came_from, start, end), 
-  #      cost = cost_so_far)
+  list(path = reconstruct_path(came_from, start, end),
+       cost = cost_so_far)
 }
 
 
@@ -69,9 +89,13 @@ reconstruct_path <- function(came_from, start, end) {
   rev(path)
 }
 
+adjacent_fun <- adjacent_cache(street_graph$edges)
 
-# profvis::profvis({path <- a_star_pathfinding(14, 4, street_graph$graph, nodes)})
+profvis::profvis({
+  path <- a_star_pathfinding(80, 101, street_graph, adjacent_fun)
+})
  
+
 # get_adjacent <- \(x, graph) graph[graph[, 1] == x, 2]
 # tmp <- as.matrix(street_graph$graph)
 # profvis::profvis({path <- a_star_pathfinding(14, 4, tmp, nodes)})
