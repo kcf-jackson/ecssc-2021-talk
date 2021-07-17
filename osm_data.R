@@ -36,9 +36,9 @@ features |> map(head)
 # Load map app and open WebSocket connection for interactivity =================
 library(sketch)
 out_handler <- function(x) {
-  x %>% 
-    compile_exprs(rules = basic_rules(), deparsers = dp("basic", "macro")) %>% 
-    map(~list(type = "command", message = .x)) %>% 
+  x |> 
+    compile_exprs(rules = basic_rules(), deparsers = dp("basic", "macro")) |>
+    map(~list(type = "command", message = .x)) |>
     map(~jsonlite::toJSON(.x, auto_unbox = TRUE))
 }
 handle <- websocket$new(out_handler = out_handler)
@@ -48,11 +48,30 @@ handle$startServer()
 source_r("app.R", debug = F)
 
 # Create a helper function to send command to the browser
+hygienic_name <- function() {
+  sample(c(letters, 0:9), 8) |> paste(collapse = "")
+}
+
+out_handler_with_env <- function(x_pqse5mxv, env) {
+  local_env <- rlang::env_clone(env)
+  local_env$x_pqse5mxv <- x_pqse5mxv
+  
+  expression(
+    compile_exprs(x_pqse5mxv, 
+                  rules = basic_rules(), 
+                  deparsers = dp("basic", "macro"))
+  ) |> 
+    eval(envir = local_env) |>
+    map(~list(type = "command", message = .x)) |>
+    map(~jsonlite::toJSON(.x, auto_unbox = TRUE))
+}
+
 send <- function(x) {
-  msg <- out_handler(deparse1(substitute(x)))
-  # print(msg)
+  msg <- out_handler_with_env(deparse1(substitute(x)), env = parent.frame(1))
+  print(msg)
   handle$ws$send(msg)
 }
+
 
 # Extract suburbs ==============================================================
 suburb <- melb_mpolygons %>% 

@@ -10,7 +10,8 @@ graph <- function(n = 10) {
   # Get method
   get <- function() {
     list(graph = data.frame(from = G_from, to = G_to), 
-         attributes = G_attributes)
+         attributes = G_attributes) |> 
+      remove_empty_records()
   }
   
   # Expand storage
@@ -32,6 +33,17 @@ graph <- function(n = 10) {
   list(add = add, get = get)
 }
  
+remove_empty_records <- function(y) {
+  x <- y$graph
+  i <- nrow(x)
+  while (x[i, 1] == 0 && x[i, 2] == 0) {
+    i <- i - 1
+    if (i == 0) break
+  }
+  list(graph = head(x, i), 
+       attributes = head(y$attributes, i))
+}
+
 # # Example
 # my_graph <- graph(2)
 # my_graph$get()

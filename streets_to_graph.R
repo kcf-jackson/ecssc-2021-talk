@@ -1,12 +1,13 @@
+source("optimisation.R")
+source("graph.R")
+
+#' Build a graph from street data
 #' @param street_geometry
 #' @param one_way
 build_graph_from_streets <- function(street_geometry, one_way) {
   street_matrix <- street_geometry |> map(as.matrix)
   total <- do.call(rbind, street_matrix)
   total <- total[, 2:1]
-  
-  master_indices <- which(duplicated(total, fromLast = TRUE) & !duplicated(total))
-  master_entries <- total[master_indices, ]
   
   nodes <- unique(total)
   
@@ -18,21 +19,7 @@ build_graph_from_streets <- function(street_geometry, one_way) {
   
   same_location <- function(x, y) all(x == y)
   
-  # find_cid <- function(centry) {
-  #   for (ind in master_indices) {
-  #     if (same_location(total[ind, ], centry)) {
-  #       return(ind)
-  #     }
-  #   }
-  #   stop("This line should not be reached.")
-  # }
-  find_cid <- function(centry) {
-    # ind <- which.min(pdist::pdist(master_entries, centry)@dist)
-    ind <- find_x_pos_in_y(centry, master_entries) + 1
-    if (ind == 0) stop("This line should not be reached.")
-    # assertthat::assert_that(ind == ind2)
-    master_indices[ind]
-  }
+  find_cid <- function(centry) find_x_pos_in_y(centry, nodes) + 1
   
   # Main
   network_graph <- graph(1000)
@@ -84,5 +71,6 @@ build_graph_from_streets <- function(street_geometry, one_way) {
     pid <- cid
   }
   
-  network_graph$get()
+  g <- network_graph$get()
+  list(edges = g$graph, edges_attributes = g$attributes, nodes = nodes)
 }
