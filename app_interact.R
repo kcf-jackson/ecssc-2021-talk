@@ -22,3 +22,10 @@ polygon <- function(x, ...) {
   options <- list(...)
   send(L$polygon(.data(x, digits = NA), .data(options))$addTo(map))  
 }
+
+#' Send a request to the browser to send back the data stored in a variable
+collect <- function() {
+  send(ws$send(
+    JSON::stringify(list(type = "data", message = selection))
+  ))
+}

@@ -1,14 +1,5 @@
-source("streets_to_graph.R")
-system.time({
-  street_graph <- build_graph_from_streets(
-    melb_lines$geometry,
-    grepl(x = melb_lines$other_tags,
-          pattern = "\"oneway\"=>\"yes\"")
-  )
-})
-
-source("queue.R")
-source("binary_search.R")
+source("DS_queue.R")
+source("AG_binary_search.R")
 
 Char <- as.character
 
@@ -16,6 +7,12 @@ dist <- \(x, y) sqrt(sum((x - y)^2))
 
 manhattan <- \(x, y) sum(abs(x - y))
 
+#' Apply binary search to finding neighbours on a graph (edgelist)
+#' @description This function will sort the graph based on the `from` column, 
+#' and create a function that uses binary search to locate the neighbors of a
+#' given node.
+#' @param graph A graph; the edgelist.
+#' @export
 adjacent_cache <- function(graph) {
   g_sorted <- graph |> arrange(from)
   counts <- g_sorted %>% group_by(from) %>% summarise(count = n())
@@ -36,14 +33,20 @@ adjacent_cache <- function(graph) {
   return(get_adjacent)
 }
 
-a_star_pathfinding <- function(start, end, graph, get_adjacent) {
+#' Pathfinding using the A*-algorithm
+#' @param start An integer; the node id.
+#' @param end An integer; the node id.
+#' @param graph The graph, with both edge-list and node-list.
+#' @param get_adjacent (Optional) A function for finding the neighbors of a node.
+#' @export
+find_path <- function(start, end, graph, get_adjacent) {
   coordinates <- graph$nodes
     
   heuristic <- \(a, b) manhattan(coordinates[a, ], coordinates[b, ])
   graph_cost <- \(a, b) dist(coordinates[a, ], coordinates[b, ])
 
   if (missing(get_adjacent)) {
-    get_adjacent <- adjacent_cache(graph)
+    get_adjacent <- adjacent_cache(graph$edges)
   }
   
   frontier <- PriorityQueue()
@@ -77,7 +80,6 @@ a_star_pathfinding <- function(start, end, graph, get_adjacent) {
        cost = cost_so_far)
 }
 
-
 reconstruct_path <- function(came_from, start, end) {
   current <- end
   path <- c()
@@ -88,24 +90,3 @@ reconstruct_path <- function(came_from, start, end) {
   path <- append(path, start)
   rev(path)
 }
-
-adjacent_fun <- adjacent_cache(street_graph$edges)
-
-profvis::profvis({
-  path <- a_star_pathfinding(80, 101, street_graph, adjacent_fun)
-})
- 
-
-# get_adjacent <- \(x, graph) graph[graph[, 1] == x, 2]
-# tmp <- as.matrix(street_graph$graph)
-# profvis::profvis({path <- a_star_pathfinding(14, 4, tmp, nodes)})
-
-
-# g <- street_graph$graph
-# gm <- as.matrix(g)
-# g_sorted <- g |> arrange(from)
-# microbenchmark::microbenchmark(
-#   g[g$from == 111, ]$to, 
-#   gm[gm[, 1] == 111, 2],
-#   g_sorted[g_sorted$from == 111, ]$to
-# )

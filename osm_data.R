@@ -1,11 +1,12 @@
 #===============================================================================
-# © OpenStreetMap contributors
+# OSM data © OpenStreetMap contributors
 # OSM data is available under the Open Database Licence.
 # OSM copyright and licence: https://www.openstreetmap.org/copyright
 #===============================================================================
 
 
-# Setup ========================================================================
+# Set-up =======================================================================
+# remotes::install_github("kcf-jackson/sketch", "experiment")
 library(osmextract)
 library(sf)
 library(purrr)
@@ -25,52 +26,62 @@ melb_mlines <- oe_read(file, "multilinestrings")
 melb_mpolygons <- oe_read(file, "multipolygons")
 melb_relations <- oe_read(file, "other_relations")
 
-# Combine the features into one master object
-features <- list(melb_lines, melb_points, melb_mlines, melb_mpolygons, melb_relations)
-features |> map_dbl(nrow) %>% 
-  data.frame(lyer_name = feature_counts$name, features = .)
-features |> map_dbl(ncol)
-features |> map(head)
+# Start an interactive leaflet map session
+source("app_load.R")
+JS_env <- new.env()   # This variable is used to collect data from the browser later
+handle <- start_map_server(JS_env)
 
 
-# Load map app and open WebSocket connection for interactivity =================
-library(sketch)
-out_handler <- function(x) {
-  x |> 
-    compile_exprs(rules = basic_rules(), deparsers = dp("basic", "macro")) |>
-    map(~list(type = "command", message = .x)) |>
-    map(~jsonlite::toJSON(.x, auto_unbox = TRUE))
+# Analysis =====================================================================
+# Inspect the data 
+View(melb_melb_mpolygons)
+View(melb_lines)
+
+# Get the suburbs and streets
+suburb <- melb_mpolygons |>
+  filter(type == "boundary", boundary == "administrative", admin_level == 6)
+street <- melb_lines |> filter(!is.na(highway))
+
+# Use a routing service
+# Approach 1 - Turn the street data into a graph and use a path-finding algorithm
+# This allows you to do live changes on the graph and re-routing
+source("SC_streets_to_graph.R")
+# Takes about 5 mins
+system.time({
+  street_graph <- build_graph_from_streets(
+    street_geometry = melb_lines$geometry,
+    one_way = grepl(x = melb_lines$other_tags, pattern = "\"oneway\"=>\"yes\"")
+  )
+})
+nodes <- street_graph$nodes
+
+# Using the graph for some basic computation
+source("AG_path_finding.R")
+source("SC_utils.R")
+points(nodes[60, ])
+points(nodes[100, ], color = "red")
+
+adjacent_fun <- adjacent_cache(street_graph$edges)
+route <- find_path(60, 100, street_graph, adjacent_fun)
+lines(nodes[route$path, ])
+
+
+#-------------------------------------------------------------------------------
+# Approach 2 - use the OSRM service --------------------------------------------
+# This does not allow graph changes and re-routing, but it has very good performance.
+# See docker set-up instruction at https://github.com/Project-OSRM/osrm-backend
+# Also, see the R binding at https://github.com/riatelab/osrm
+find_path_2 <- function(x, y, nodes) {
+  # osrm takes lng-lat as inputs
+  src <- rev(nodes[x, ])
+  dst <- rev(nodes[y, ])
+  osrm::osrmRoute(src, dst, returnclass = "sf", overview = "full", 
+                  osrm.server = "http://127.0.0.1:5000/")
 }
-handle <- websocket$new(out_handler = out_handler)
-handle$startServer()
+route <- find_path_2(60, 100, nodes)
+lines(route$geometry[[1]] |> as_latlng_matrix(), color = "brown")
 
-# Start the app
-source_r("app.R", debug = F)
 
-# Create a helper function to send command to the browser
-hygienic_name <- function() {
-  sample(c(letters, 0:9), 8) |> paste(collapse = "")
-}
-
-out_handler_with_env <- function(x_pqse5mxv, env) {
-  local_env <- rlang::env_clone(env)
-  local_env$x_pqse5mxv <- x_pqse5mxv
-  
-  expression(
-    compile_exprs(x_pqse5mxv, 
-                  rules = basic_rules(), 
-                  deparsers = dp("basic", "macro"))
-  ) |> 
-    eval(envir = local_env) |>
-    map(~list(type = "command", message = .x)) |>
-    map(~jsonlite::toJSON(.x, auto_unbox = TRUE))
-}
-
-send <- function(x) {
-  msg <- out_handler_with_env(deparse1(substitute(x)), env = parent.frame(1))
-  print(msg)
-  handle$ws$send(msg)
-}
 
 
 # Extract suburbs ==============================================================
@@ -206,8 +217,7 @@ send(L$circleMarker(.data(tmp), list(radius = 4))$addTo(map))
 tmp_src <- rev(tmp_src)
 tmp_dst <- rev(tmp_dst)
 tmp <- rev(tmp)
-route <- osrmRoute(src = tmp_src, dst = tmp_dst, returnclass = "sf", 
-                   overview = "full", osrm.server = "http://127.0.0.1:5000/")
+
 route_simplified <- osrmRoute(src = tmp_src, dst = tmp_dst, returnclass = "sf", 
                              osrm.server = "http://127.0.0.1:5000/")
 route_latlngs <- route$geometry[[1]] %>% as.matrix() %>% extract(, 2:1)

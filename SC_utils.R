@@ -38,3 +38,11 @@ centroid <- function(m0) {
   cy <- sum((yi + yip1) * (xi*yip1 - xip1*yi)) / (6 * A)
   c(cx, cy)
 }
+
+as_latlng_matrix <- function(x) {
+  res <- as.matrix(x)
+  if (any(range(res[, 1]) < -90) || any(range(res[, 1]) > 90)) {
+    return(res[, 2:1])
+  }
+  res
+}

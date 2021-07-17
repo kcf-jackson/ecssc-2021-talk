@@ -1,9 +1,9 @@
-source("optimisation.R")
-source("graph.R")
+source("DS_graph.R")
 
 #' Build a graph from street data
-#' @param street_geometry
-#' @param one_way
+#' @param street_geometry A list of geometry objects.
+#' @param one_way A boolean vector; whether the street is one-way.
+#' @export
 build_graph_from_streets <- function(street_geometry, one_way) {
   street_matrix <- street_geometry |> map(as.matrix)
   total <- do.call(rbind, street_matrix)
@@ -19,7 +19,7 @@ build_graph_from_streets <- function(street_geometry, one_way) {
   
   same_location <- function(x, y) all(x == y)
   
-  find_cid <- function(centry) find_x_pos_in_y(centry, nodes) + 1
+  find_cid <- function(centry) find_x_position_in_y(centry, nodes) + 1
   
   # Main
   network_graph <- graph(1000)
@@ -74,3 +74,14 @@ build_graph_from_streets <- function(street_geometry, one_way) {
   g <- network_graph$get()
   list(edges = g$graph, edges_attributes = g$attributes, nodes = nodes)
 }
+
+
+find_x_position_in_y <- Rcpp::cppFunction("
+int find_cind(NumericVector x, NumericMatrix y) {
+  for (int i = 0; i < y.nrow(); i++) {
+    if (x[0] == y[i] && x[1] == y[i + y.nrow()]) {
+      return i;
+    }
+  }
+  return -1;
+}")
