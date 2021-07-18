@@ -1,8 +1,11 @@
 source("DS_graph.R")
+source("AG_binary_search.R")
 
 #' Build a graph from street data
 #' @param street_geometry A list of geometry objects.
 #' @param one_way A boolean vector; whether the street is one-way.
+#' @return A list containing the edges, the (unique) nodes, node ids of the full
+#' list of nodes collected from the street geometry.
 #' @export
 build_graph_from_streets <- function(street_geometry, one_way) {
   street_matrix <- street_geometry |> map(as.matrix)
@@ -10,9 +13,12 @@ build_graph_from_streets <- function(street_geometry, one_way) {
   total <- total[, 2:1]
   
   nodes <- unique(total)
+  total_id <- numeric(nrow(total))
+  total_id[1] <- 1
   
   row_counts <- street_matrix |> map(nrow)
-  header_ids <- cumsum(row_counts) + 1
+  street_end <- cumsum(row_counts)
+  header_ids <- street_end + 1
   
   one_way <- purrr::map2(one_way, row_counts, ~rep(.x, .y)) %>% 
     do.call(c, .)
@@ -36,6 +42,7 @@ build_graph_from_streets <- function(street_geometry, one_way) {
     
     while (!same_location(node_centry, centry)) {
       cid <- find_cid(centry)
+      total_id[crow] <- cid
       # An edge requires two nodes, so skip the edge building if current node is 
       # the first node of the street
       if (crow == header_ids[header_pointer]) {
@@ -56,6 +63,7 @@ build_graph_from_streets <- function(street_geometry, one_way) {
     
     # Same location
     cid <- node_cid
+    total_id[crow] <- cid
     if (crow == header_ids[header_pointer]) {
       header_pointer <- header_pointer + 1
     } else {
@@ -72,7 +80,11 @@ build_graph_from_streets <- function(street_geometry, one_way) {
   }
   
   g <- network_graph$get()
-  list(edges = g$graph, edges_attributes = g$attributes, nodes = nodes)
+  list(edges = g$graph, edges_attributes = g$attributes, 
+       nodes = nodes,
+       total_id = total_id,
+       get_adjacent = adjacent_cache(g$graph),
+       street_start = c(1, head(street_end, -1)), street_end = street_end)
 }
 
 
@@ -85,3 +97,29 @@ int find_cind(NumericVector x, NumericMatrix y) {
   }
   return -1;
 }")
+
+
+#' Apply binary search to finding neighbours on a graph (edgelist)
+#' @description This function will sort the graph based on the `from` column, 
+#' and create a function that uses binary search to locate the neighbors of a
+#' given node.
+#' @param edgelist The edgelist.
+adjacent_cache <- function(edgelist) {
+  g_sorted <- graph |> arrange(from)
+  counts <- g_sorted %>% group_by(from) %>% summarise(count = n())
+  order_hashmap <- cumsum(counts$count)
+  
+  get_adjacent <- function(x) {
+    index <- binary_search(x, counts$from)
+    if (index == -1) {
+      return(numeric(0))
+    } else if (index == 1) {
+      adja_rows <- 1:order_hashmap[index]
+    } else {
+      adja_rows <- (order_hashmap[index-1] + 1):order_hashmap[index]
+    }
+    g_sorted[adja_rows, ]$to
+  }
+  
+  return(get_adjacent)
+}

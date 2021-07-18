@@ -1,37 +1,8 @@
 source("DS_queue.R")
-source("AG_binary_search.R")
-
 Char <- as.character
-
 dist <- \(x, y) sqrt(sum((x - y)^2))
-
 manhattan <- \(x, y) sum(abs(x - y))
 
-#' Apply binary search to finding neighbours on a graph (edgelist)
-#' @description This function will sort the graph based on the `from` column, 
-#' and create a function that uses binary search to locate the neighbors of a
-#' given node.
-#' @param graph A graph; the edgelist.
-#' @export
-adjacent_cache <- function(graph) {
-  g_sorted <- graph |> arrange(from)
-  counts <- g_sorted %>% group_by(from) %>% summarise(count = n())
-  order_hashmap <- cumsum(counts$count)
-  
-  get_adjacent <- function(x) {
-    index <- binary_search(x, counts$from)
-    if (index == -1) {
-      return(numeric(0))
-    } else if (index == 1) {
-      adja_rows <- 1:order_hashmap[index]
-    } else {
-      adja_rows <- (order_hashmap[index-1] + 1):order_hashmap[index]
-    }
-    g_sorted[adja_rows, ]$to
-  }
-  
-  return(get_adjacent)
-}
 
 #' Pathfinding using the A*-algorithm
 #' @param start An integer; the node id.
@@ -39,15 +10,12 @@ adjacent_cache <- function(graph) {
 #' @param graph The graph, with both edge-list and node-list.
 #' @param get_adjacent (Optional) A function for finding the neighbors of a node.
 #' @export
-find_path <- function(start, end, graph, get_adjacent) {
+find_path <- function(start, end, graph) {
   coordinates <- graph$nodes
-    
+  get_adjacent <- graph$get_adjacent
+  
   heuristic <- \(a, b) manhattan(coordinates[a, ], coordinates[b, ])
   graph_cost <- \(a, b) dist(coordinates[a, ], coordinates[b, ])
-
-  if (missing(get_adjacent)) {
-    get_adjacent <- adjacent_cache(graph$edges)
-  }
   
   frontier <- PriorityQueue()
   frontier$put(start, 0)
@@ -73,7 +41,7 @@ find_path <- function(start, end, graph, get_adjacent) {
         came_from[[Char(next_entry)]] <- current
       }
     }
-    if (frontier$length() > 10000) browser()
+    # if (frontier$length() > 10000) browser()
   }
   
   list(path = reconstruct_path(came_from, start, end),

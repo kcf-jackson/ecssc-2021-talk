@@ -60,9 +60,7 @@ source("AG_path_finding.R")
 source("SC_utils.R")
 points(nodes[60, ])
 points(nodes[100, ], color = "red")
-
-adjacent_fun <- adjacent_cache(street_graph$edges)
-route <- find_path(60, 100, street_graph, adjacent_fun)
+route <- find_path(60, 100, street_graph)
 lines(nodes[route$path, ])
 
 
@@ -71,10 +69,10 @@ lines(nodes[route$path, ])
 # This does not allow graph changes and re-routing, but it has very good performance.
 # See docker set-up instruction at https://github.com/Project-OSRM/osrm-backend
 # Also, see the R binding at https://github.com/riatelab/osrm
-find_path_2 <- function(x, y, nodes) {
+find_path_2 <- function(id_1, id_2, nodes) {
   # osrm takes lng-lat as inputs
-  src <- rev(nodes[x, ])
-  dst <- rev(nodes[y, ])
+  src <- rev(nodes[id_1, ])
+  dst <- rev(nodes[id_2, ])
   osrm::osrmRoute(src, dst, returnclass = "sf", overview = "full", 
                   osrm.server = "http://127.0.0.1:5000/")
 }

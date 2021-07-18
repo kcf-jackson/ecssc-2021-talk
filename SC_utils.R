@@ -1,3 +1,21 @@
+#' 
+nearest_node <- function(x, nodes, k = 1) {
+  d <- pdist::pdist(x, nodes)@dist
+  ind <- head(order(d), k)
+  nodes[ind, ]
+}
+
+#' #' 
+#' which_street <- function(x, graph) {
+#'   nx <- nearest_node(x, graph$nodes, k = 1)  
+#'   find_x_position_in_y(x, )
+#' }
+
+first_exceed <- function(x, ys) {
+  min(which(x >= ys))
+}
+
+
 # is_connected <- function(x1, x2, lonlat = TRUE) {
 #   dist_matrix <- raster::pointDistance(x1, x2, lonlat = lonlat)
 #   min(dist_matrix) == 0

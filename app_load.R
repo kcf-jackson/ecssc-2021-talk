@@ -39,8 +39,8 @@ start_map_server <- function(env) {
 #' @param message TRUE / FALSE; whether to show the message to be sent to the 
 #' browser. This is useful for debugging.
 #' @export
-send <- function(x, message = F) {
-  msg <- out_handler_with_env(deparse1(substitute(x)), env = parent.frame(1))
+send <- function(x, message = F, n = 1) {
+  msg <- out_handler_with_env(deparse1(substitute(x)), env = parent.frame(n))
   if (message) print(msg)
   handle$ws$send(msg)
 }
