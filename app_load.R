@@ -40,7 +40,8 @@ start_map_server <- function(env) {
 #' browser. This is useful for debugging.
 #' @export
 send <- function(x, message = F, n = 1) {
-  msg <- out_handler_with_env(deparse1(substitute(x)), env = parent.frame(n))
+  msg <- out_handler_with_env(deparse1(substitute(x), collapse = "\n"), 
+                              env = parent.frame(n))
   if (message) print(msg)
   handle$ws$send(msg)
 }
@@ -53,7 +54,7 @@ out_handler_with_env <- function(x_pqse5mxv, env) {
   expression(
     compile_exprs(x_pqse5mxv, 
                   rules = basic_rules(), 
-                  deparsers = dp("basic", "macro"))
+                  deparsers = dp("basic", "auto", "macro"))
   ) |> 
     eval(envir = local_env) |>
     map(~list(type = "command", message = .x)) |>
