@@ -105,7 +105,7 @@ int find_cind(NumericVector x, NumericMatrix y) {
 #' given node.
 #' @param edgelist The edgelist.
 adjacent_cache <- function(edgelist) {
-  g_sorted <- graph |> arrange(from)
+  g_sorted <- edgelist |> arrange(from)
   counts <- g_sorted %>% group_by(from) %>% summarise(count = n())
   order_hashmap <- cumsum(counts$count)
   
