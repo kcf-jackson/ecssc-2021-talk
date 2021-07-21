@@ -1,31 +1,46 @@
 # Map plotting primitives
 
+#' @param x A pair / matrix of coordinates
 #' @export
-points <- function(x, ...) {
+points <- function(x, id = NULL, ...) {
   options <- list(...)
   if (is.matrix(x)) {
     for (i in 1:nrow(x)) {
       datum <- x[i, ]
-      send(L$circleMarker(.data(datum, digits = NA),
-                          .data(options))$addTo(map))
+      send(leaflet_layers$add(
+        L$circleMarker(.data(datum, digits = NA),
+                       .data(options))$addTo(map),
+        .data(id, null = "null")
+      ))
       Sys.sleep(0.01)
     }
   } else {
-    send(L$circleMarker(.data(x, digits = NA),
-                        .data(options))$addTo(map))
+    send(leaflet_layers$add(
+      L$circleMarker(.data(x, digits = NA),
+                     .data(options))$addTo(map),
+      .data(id, null = "null")
+    ))
   }
 }
 
+#' @param x A matrix of coordinates
 #' @export
-lines <- function(x, ...) {
+lines <- function(x, id = NULL, ...) {
   options <- list(...)
-  send(L$polyline(.data(x, digits = NA), .data(options))$addTo(map))  
+  send(leaflet_layers$add(
+    L$polyline(.data(x, digits = NA), .data(options))$addTo(map),
+    .data(id, null = "null")
+  ))  
 }
 
+#' @param x A matrix of coordinates
 #' @export
-polygon <- function(x, ...) {
+polygon <- function(x, id = NULL, ...) {
   options <- list(...)
-  send(L$polygon(.data(x, digits = NA), .data(options))$addTo(map))  
+  send(leaflet_layers$add(
+    L$polygon(.data(x, digits = NA), .data(options))$addTo(map),
+    .data(id, null = "null")
+  ))
 }
 
 #' Send a request to the browser to send back the data stored in a variable
@@ -35,6 +50,50 @@ collect <- function() {
     JSON::stringify(list(type = "data", message = selection))
   ))
 }
+
+#' @param x A character string; the element / reference id.
+#' @export
+select <- function(x) {
+  send(active <- leaflet_layers$get(.data(x)))  
+}
+
+#' @param x A matrix of coordinates
+#' @export
+animate_along <- function(x, step_size = 0.0001, start = TRUE, ...) {
+  options <- list(...)
+  start_coord <- x[1, ]
+  
+  send(Routes(
+    .data(x, digits = NA),
+    .data(step_size),
+    (function() {
+      start_marker <- L$circleMarker(
+        .data(start_coord, digits = NA),
+        .data(options)
+      )$addTo(map)
+      return(function(latlng) { 
+        # console::log(latlng)
+        start_marker$setLatLng(latlng) 
+      })
+    })() 
+  )[0]$begin())
+  
+  # if (start) {
+  #   Sys.sleep(0.001)
+  #   send(active[0]$begin())
+  # }
+}
+
+#' #' @export
+#' remove <- function(x, all = TRUE) {
+#'   x <- paste0(".", x)
+#'   if (all) {
+#'     send(Array::from(select_doms(.data(x)))$
+#'            map(x %=>% x$remove()))
+#'   } else {
+#'     send(select_dom(.data(x))$remove())
+#'   }
+#' }
 
 
 #===============================================================================
