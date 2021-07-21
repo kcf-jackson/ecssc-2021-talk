@@ -10,12 +10,15 @@
 #! load_library("websocket")
 #! load_library("dom")
 #! load_library("d3")
+#! load_script("app_helpers.R")
+#! load_script("app_animate_route.R")
 
 
 # Helpers and variables ========================================================
-c <- Array
 selection <- c()
 map <- NULL
+leaflet_layers <- Namespace()
+active <- NULL
 
 
 # Interface ====================================================================

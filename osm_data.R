@@ -32,18 +32,18 @@ JS_env <- new.env()   # This variable is used to collect data from the browser l
 handle <- start_map_server(JS_env)
 
 
-# Analysis =====================================================================
-# Inspect the data 
+# Basic analysis and visualisations ============================================
+# 1. Streets ===================================================================
+# a. Inspect the data 
 View(melb_melb_mpolygons)
 View(melb_lines)
 
-# Get the suburbs and streets
-suburb <- melb_mpolygons |>
-  filter(type == "boundary", boundary == "administrative", admin_level == 6)
+# b. Get the streets
 street <- melb_lines |> filter(!is.na(highway))
 
-# Use a routing service
-# Approach 1 - Turn the street data into a graph and use a path-finding algorithm
+# c. Use a routing service
+#-------------------------------------------------------------------------------------
+# Approach 1 - Turn the street data into a graph and use a path-finding algorithm ----
 # This allows you to do live changes on the graph and re-routing
 source("SC_streets_to_graph.R")
 # Takes about 5 mins
@@ -63,12 +63,21 @@ points(nodes[100, ], color = "red")
 route <- find_path(60, 100, street_graph)
 lines(nodes[route$path, ])
 
+# Reduce the set of streets to the main roads for better routing
+source("AG_path_finding_multilevel.R")
+filtered_street <- street |>
+  filter(!highway %in% c("footway", "residential", "service"))
+reduced_graph <- simplify_graph(street_graph, filtered_street$geometry)
+route <- find_path_multilevel(60, 100, reduced_graph)
+lines(nodes[route$path, ], color = "orange")
+
 
 #-------------------------------------------------------------------------------
 # Approach 2 - use the OSRM service --------------------------------------------
-# This does not allow graph changes and re-routing, but it has very good performance.
+# It does not seem to allow graph changes and re-routing, but it has very good performance.
 # See docker set-up instruction at https://github.com/Project-OSRM/osrm-backend
 # Also, see the R binding at https://github.com/riatelab/osrm
+# After starting the OSRM server with docker, run the following code:
 find_path_2 <- function(id_1, id_2, nodes) {
   # osrm takes lng-lat as inputs
   src <- rev(nodes[id_1, ])
@@ -78,11 +87,42 @@ find_path_2 <- function(id_1, id_2, nodes) {
 }
 route <- find_path_2(60, 100, nodes)
 lines(route$geometry[[1]] |> as_latlng_matrix(), color = "brown")
+#-------------------------------------------------------------------------------
+
+# d. Animate along a route
+animate_along(nodes[route$path, ], step_size = 0.0001, color = "orange")
+
+# Larger scale 
+set.seed(123)
+m <- 1000
+start <- sample(nrow(nodes), m)
+end <- sample(nrow(nodes), m)
+routes <- purrr::map(seq(m), ~find_path_2(start[.x], end[.x], nodes))
+
+points(nodes[start, ], radius = 5)
+points(nodes[end, ], color = "red", radius = 5)
+for (route in routes) {
+  m <- route$geometry[[1]] |> as_latlng_matrix()
+  lines(m, opacity = 0.5)
+  Sys.sleep(0.01)
+}
+
+for (route in routes) {
+  m <- route$geometry[[1]] |> as_latlng_matrix()
+  animate_along(m, step_size = 0.0001, 
+                color = "brown", fill = TRUE,
+                fillOpacity = 0.8, radius = 5)
+  Sys.sleep(0.01)
+}
+
+# routes <- purrr::map(1:100, function(i) {
+#   print(i)
+#   find_path_multilevel(start[i], end[i], reduced_graph)
+# })
 
 
-
-
-# Extract suburbs ==============================================================
+#-------------------------------------------------------------------------------
+# 2. Suburbs ===================================================================
 suburb <- melb_mpolygons %>% 
   filter(type == "boundary", boundary == "administrative", admin_level == 6)
 boundary <- suburb$geometry
