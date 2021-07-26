@@ -4,22 +4,17 @@
 #' @export
 points <- function(x, id = NULL, ...) {
   options <- list(...)
-  if (is.matrix(x)) {
-    for (i in 1:nrow(x)) {
-      datum <- x[i, ]
-      send(leaflet_layers$add(
-        L$circleMarker(.data(datum, digits = NA),
-                       .data(options))$addTo(map),
-        .data(id, null = "null")
-      ))
-      Sys.sleep(0.01)
-    }
-  } else {
+  if (!is.matrix(x)) {
+    x <- matrix(x, nrow = 1)
+  }
+  for (i in 1:nrow(x)) {
+    datum <- x[i, ]
     send(leaflet_layers$add(
-      L$circleMarker(.data(x, digits = NA),
+      L$circleMarker(.data(datum, digits = NA),
                      .data(options))$addTo(map),
       .data(id, null = "null")
     ))
+    Sys.sleep(0.01)
   }
 }
 
@@ -42,6 +37,35 @@ polygon <- function(x, id = NULL, ...) {
     .data(id, null = "null")
   ))
 }
+
+#' @param x A pair / matrix of coordinates
+#' @export
+text <- function(x, labels, id = NULL, ...) {
+  options <- list(...)
+  if (!is.matrix(x)) {
+    x <- matrix(x, nrow = 1)
+  }
+  for (i in 1:nrow(x)) {
+    datum <- x[i, ]
+    send(leaflet_layers$add(
+      L$marker(.data(datum, digits = NA), list(opacity = 0))$
+        bindTooltip(.data(labels), 
+                    list(permanent = TRUE, 
+                         direction = "center",
+                         className = "my-text-label"))$
+        addTo(map),
+      .data(id, null = "null")
+    ))
+    Sys.sleep(0.01)
+  }
+}
+
+
+#' @param x A pair of coordinates
+zoom_to <- function(x, zoom = 10) {
+  send(map$flyTo(.data(x, digits = NA), .data(zoom)))
+} 
+
 
 #' Send a request to the browser to send back the data stored in a variable
 #' @export
