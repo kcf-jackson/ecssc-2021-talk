@@ -1,7 +1,7 @@
 #! config(debug = T, rules = basic_rules(), deparsers = dp("basic", "auto"))
 
 Route <- function(start, end, step_size, render = console::log, 
-                  milliseconds = 20) {
+                  milliseconds = 200) {
   alpha <- 0
   speed <- step_size / dist(start, end)
   callback <- NULL
@@ -24,15 +24,28 @@ Route <- function(start, end, step_size, render = console::log,
   }
   
   begin <- function() {
-    timer <- setInterval(function() {
-      res <- step()
-      if (res$alpha >= 1) {
-        clearInterval(timer)
-        if (callback) callback()
+    then <- performance$now()
+    
+    animate <- function() {
+      timer <- requestAnimationFrame(animate)
+      
+      now <- performance$now()
+      elapsed <- now - then
+      if (elapsed > milliseconds) {
+        then <<- now - (elapsed %% milliseconds)
+
+        # main animation loop
+        res <- step()
+        if (res$alpha >= 1) {
+          window$cancelAnimationFrame(timer)
+          if (callback) callback()
+        }
+        render(res$position)
       }
-      render(res$position)
-    }, milliseconds)
-    handle <<- timer
+      return(timer)
+    }
+    
+    handle <<- animate()
     handle
   }
   

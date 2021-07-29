@@ -83,7 +83,8 @@ select <- function(x) {
 
 #' @param x A matrix of coordinates
 #' @export
-animate_along <- function(x, step_size = 0.0001, start = TRUE, ...) {
+animate_along <- function(x, step_size = 0.0002, start = TRUE, 
+                          milliseconds = 40, ...) {
   options <- list(...)
   start_coord <- x[1, ]
   
@@ -99,7 +100,8 @@ animate_along <- function(x, step_size = 0.0001, start = TRUE, ...) {
         # console::log(latlng)
         start_marker$setLatLng(latlng) 
       })
-    })() 
+    })(),
+    .data(milliseconds)
   )[0]$begin())
   
   # if (start) {
