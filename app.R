@@ -27,7 +27,7 @@ render(div(id = "demo_map", style = "width: 98vw; height: 97vh"))
 
 # Set up a leaflet map
 bounding_points <- c(c(-37.6134, 144.6924), c(-38.0267, 145.5068))
-map <- L$map("demo_map", list(preferCanvas = TRUE))$
+map <- L$map("demo_map", list(preferCanvas = FALSE))$
   fitBounds(bounding_points)
 
 # Add tile to the map
