@@ -47,12 +47,17 @@ street <- melb_lines |> filter(!is.na(highway))
 # This allows you to do live changes on the graph and re-routing
 source("SC_streets_to_graph.R")
 # Takes about 5-8 mins
-system.time({
-  street_graph <- build_graph_from_streets(
-    street_geometry = melb_lines$geometry,
-    one_way = grepl(x = melb_lines$other_tags, pattern = "\"oneway\"=>\"yes\"")
-  )
-})
+if (!file.exists("street_graph")) {
+  system.time({
+    street_graph <- build_graph_from_streets(
+      street_geometry = melb_lines$geometry,
+      one_way = grepl(x = melb_lines$other_tags, pattern = "\"oneway\"=>\"yes\"")
+    )
+  })
+  save(street_graph, file = "street_graph")
+} else {
+  load("street_graph", verbose = TRUE)
+}
 nodes <- street_graph$nodes
 
 # Using the graph for some basic computation
@@ -92,9 +97,14 @@ lines(route, color = "brown")
 #-------------------------------------------------------------------------------
 
 # d. Animate along a route
-animate_along(nodes[route$path, ], step_size = 0.0001, color = "orange")
+# Approach 1
+# animate_along(nodes[route$path, ], step_size = 0.0001, color = "orange")
 
-# Larger scale 
+# Approach 2
+# animate_along(route, step_size = 0.0001, color = "orange")
+
+
+# Larger scale (demo 3)
 # https://www.vicroads.vic.gov.au/traffic-and-road-use/road-network-and-performance/road-use-and-performance
 # The peak hourly traffic for the busiest road (at 8am) is about 10-12K
 set.seed(123)
@@ -110,12 +120,12 @@ points(nodes[start, ], radius = 5)
 points(nodes[end, ], color = "red", radius = 5)
 for (route in routes) {
   lines(route, opacity = 0.5)
-  Sys.sleep(0.01)
+  Sys.sleep(0.02)
 }
 
 for (route in routes) {
-  animate_along(route, step_size = 0.0001, 
+  animate_along(route, step_size = 0.0002, 
                 color = "brown", fill = TRUE,
                 fillOpacity = 0.8, radius = 5)
-  Sys.sleep(0.01)
+  Sys.sleep(0.02)
 }
