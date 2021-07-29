@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Enhancing Markov-chain spatial simulation with web mapping technology</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Chun Fung Kwok (Jackson)" />
+    <script src="libs/header-attrs-2.8/header-attrs.js"></script>
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+    <link rel="stylesheet" href="ecssc_2021_styles.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: left, middle, inverse, title-slide
+
+# Enhancing Markov-chain spatial simulation with web mapping technology
+### Chun Fung Kwok (Jackson)
+### St. Vincent’s Institute of Medical Research (SVI)
+### 2021/07/30 @ ECSSC 2021
+
+---
+
+
+
+
+
+## Outline
+
+### 1. Motivation
+
+### 2. Working with web mapping data in R
+.medium[
+- The data
+- Basic queries and visualisation
+- Converting map data into a graph
+]
+
+### 3. Markov Chain on graph
+.medium[
+- The model  
+- Enhancement with web mapping
+]
+
+_(Slides are available at `https://github.com/kcf-jackson/ecssc-2021-talk/`.)_
+
+
+
+
+---
+
+## Motivation
+
+### A few simple questions...
+
+.medium[
+_"How many cafes / restaurants are there in Melbourne CBD?"_
+
+_"What does the flow between suburbs look like over a typical day?"_
+
+_"If a road is blocked, how much extra time does it cost?"_
+
+_"Given a residential address, how good is its access to shops, supermarkets, restaurants, hospitals, etc.?"_
+]
+
+--
+
+.medium[
+#### To answer this type of questions, we need:
+1. __web mapping data__ ([OpenStreetMap data](https://download.geofabrik.de/index.html), loaded into R with `osmextract`)
+2. the capacity to perform __spatial simulation__ and
+3. manipulate the __map interactively__ to display information (`sketch` and `leaflet.js`)
+]
+
+
+
+
+---
+
+## Working with web mapping data in R
+
+### The data
+
+
+```r
+library(osmextract)
+library(sf)
+library(dplyr)
+
+file &lt;- "./data/melbourne.osm.pbf"      # Load data
+feature_counts &lt;- st_layers(file)       # Get a summary of what's available
+```
+
+--
+
+
+```r
+&gt; feature_counts
+Driver: OSM 
+Available layers:
+        layer_name       geometry_type features fields
+1           points               Point       NA     10
+2            lines         Line String       NA      9
+3 multilinestrings   Multi Line String       NA      4
+4    multipolygons       Multi Polygon       NA     25
+5  other_relations Geometry Collection       NA      4
+```
+
+
+
+
+---
+
+## Working with web mapping data in R
+
+### The data
+
+
+```r
+&gt; melb_points &lt;- oe_read(file, "points")  # Import the features
+&gt; names(melb_points)
+ [1] "osm_id"     "name"       "barrier"    "highway"   
+ [5] "ref"        "address"    "is_in"      "place"     
+ [9] "man_made"   "other_tags" "geometry"  
+```
+
+--
+
+
+```r
+&gt; head(melb_points[, c("osm_id", "other_tags", "geometry")])
+Simple feature collection with 6 features and 2 fields
+Geometry type: POINT
+Dimension:     XY
+Bounding box:  xmin: 145.1294 ymin: -37.91224 xmax: 145.1368 ymax: -37.90771
+Geodetic CRS:  WGS 84
+  osm_id                                         other_tags                   geometry
+1 579287                          "traffic_calming"=&gt;"hump" POINT (145.1352 -37.90783)
+2 579296                          "traffic_calming"=&gt;"hump" POINT (145.1294 -37.90771)
+3 579301                          "traffic_calming"=&gt;"hump"   POINT (145.13 -37.90845)
+4 579306                          "traffic_calming"=&gt;"hump" POINT (145.1368 -37.90978)
+5 579314                                               &lt;NA&gt; POINT (145.1362 -37.91224)
+6 579338 "crossing"=&gt;"uncontrolled","crossing_ref"=&gt;"zebra" POINT (145.1365 -37.91158)
+```
+
+
+---
+
+## Working with web mapping data in R
+
+### Basic queries
+
+
+```r
+# Number of cafes
+&gt; sum(grepl("cafe", melb_points$other_tags))
+[1] 1918
+```
+
+--
+
+
+```r
+# Number of restaurants in Melbourne
+&gt; is_restaurant &lt;- grepl("restaurant", melb_points$other_tags)
+&gt; sum(is_restaurant)
+[1] 2360
+```
+
+--
+
+
+```r
+# Number of restaurants in Melbourne CBD
+&gt; melb_mpolygons &lt;- oe_read(file, "multipolygons")
+&gt; melb_CBD_boundary &lt;- melb_mpolygons |&gt; 
++   filter(name == "City of Melbourne") |&gt;
++   get_points_matrix()
+&gt;
+&gt; CBD_restaurants &lt;- melb_points[is_restaurant, ] |&gt;
++   filter(in_bound(geometry, melb_CBD_boundary))
+&gt; nrow(CBD_restaurants)
+[1] 605
+```
+
+
+
+
+---
+
+
+## Working with web mapping data in R
+
+### Basic visualisation (with `sketch` and `leaflet.js`)
+
+&lt;!-- &lt;video controls src="./Demo-1.mp4" type="video/mp4" style="height:50vh;"&gt;&lt;/video&gt; --&gt;
+
+&lt;iframe width="728" height="410" src="https://www.youtube.com/embed/0CWcyetOOns" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen&gt;&lt;/iframe&gt;
+
+
+---
+
+## Working with web mapping data in R
+
+### Converting map data into a graph
+
+.medium[
+To simulate movement on a map or compute geodesic distance between two points, a graph is needed.
+]
+
+.pull-left[
+.medium[
+A __graph__ encodes
+
+- a __node-list__: a list of "meaningful" points on the map  
+  _RHS: {1,2,3,4,5}_
+  
+- a __edge-list__: a list of pairs of nodes, indicating the link between the two nodes.  
+  _RHS: {(1,2), (2,1), (2,3), (2,5), (3,4), (4,5)}_
+]
+]
+
+.pull-right[
+#### An example of a graph
+![](graph_example.png)
+]
+
+---
+
+## Working with web mapping data in R
+
+### Converting map data into a graph
+
+.medium[
+
+__Suburb graph__
+
+A suburb is represented by its boundary (i.e. a set of coordinates). To construct a suburb graph, 
+
+1. __give each suburb an unique node ID and add to the node-list;__
+
+2. __for any two suburbs that share some boundary points, add an edge between them to the edge-list.__
+]
+
+---
+
+## Working with web mapping data in R
+
+### Converting map data into a graph
+
+.medium[
+__Street graph__
+
+A street is represented by a sequence of coordinates. To construct a street graph, for each street, 
+
+1. __give each coordinate an unique node ID and add to the node-list__
+  - points with the same coordinate should have the same ID
+  - the node-list should have contain duplicate entries
+2. __add an edge for every two consecutive nodes__
+  - if the street is two-way, then also add the edge for the reverse direction
+]
+
+--
+
+.medium[
+Once the graph is created, one can __use existing algorithms to find the route between any two nodes__, e.g. the A* path-finding algorithm and the multi-level Dijkstra (MLD) algorithm. 
+
+(Alternatively, the `osrm` package handles both the graph building and path-finding for you.)
+]
+
+
+
+---
+
+## The model: Markov chain on graphs
+
+.medium[
+Let `\(S = \{1,2,,..., n\}\)` be the index set of the `\(n\)` nodes ("suburbs") on a graph.
+]
+
+--
+
+.medium[
+Suppose there are `\(m\)` IID agents travelling on the graph, and 
+  - let `\(A_k(t)\)` represent the `\(k\)`-th agent and record where the agent is located at discrete time `\(t\in\mathbb{N}\)`. 
+  - The transition is modelled using a Markov chain with transition probability `\(P\left(A_k(t+1) = s | A_k(t) = s'\right)\)`.
+]
+
+--
+
+.medium[
+For any node / location `\(s \in S\)`, 
+- count the number of agents present at time `\(t\)`, `\(\displaystyle X_s(t) = \sum_{k = 1}^m 1_{A_k(t) = s}\)`.
+
+__We are interested in the dynamics of `\(X_s(t)\)` for `\(s\in S, t \in \mathbb{N}\)` __
+]
+
+
+---
+
+## Demo
+
+&lt;!-- &lt;video controls src="./Demo-2.mp4" type="video/mp4" style="height:60vh;"&gt;&lt;/video&gt; --&gt;
+
+&lt;iframe width="840" height="473" src="https://www.youtube.com/embed/5h0fKWj0bqg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen&gt;&lt;/iframe&gt;
+
+---
+
+## Enhancing the model with web mapping
+
+.medium[
+Suppose an agent decides to move from suburb `\(s\)` to suburb `\(s'\)`,
+]
+
+--
+
+.medium[
+We can sample one street node from each of `\(s\)` and `\(s'\)`, and make the agent travel the path connecting the two nodes. 
+
+- Macro-level numbers remain exactly the same.
+
+- Extra freedom to model the micro-level movement using another model (statistical or mechanistic).
+]
+
+
+---
+
+## Demo
+
+&lt;!-- &lt;video controls src="./Demo-3.mp4" type="video/mp4" style="height:60vh;"&gt;&lt;/video&gt; --&gt;
+
+&lt;iframe width="840" height="473" src="https://www.youtube.com/embed/rvuHweSQTn8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen&gt;&lt;/iframe&gt;
+
+
+---
+
+## Summary
+
+.medium[
+### Key idea
+
+Combine __web map data__, __data analysis / simulation in R__ and __interactive web map display__ to answer spatial and map queries.
+
+### Use cases
+
+✔️ Make basic queries and interactively manipulate the map  
+✔️ Improve the spatial resolution of a Markov chain on graphs  
+💡 Planning / evaluating road block disrruption  
+💡 Optimal placement of pedestrian counters  
+💡 Creating location profiles
+
+]
+
+---
+
+
+## References
+
+1. OSM data available at Geofabrik https://download.geofabrik.de/ or BBBike: https://download.bbbike.org/osm/bbbike/Melbourne/
+
+2. Australian map tagging guidelines: https://wiki.openstreetmap.org/wiki/Australian_Tagging_Guidelines
+
+3. The `sketch` R package [https://github.com/kcf-jackson/ecssc-2021-talk/](https://github.com/kcf-jackson/ecssc-2021-talk/) and the `leaflet` JavaScript library [https://leafletjs.com/](https://leafletjs.com/).
+
+.pull-left[
+I work at the __Bioinformatics and Cellular Genomics lab (BioCellGen)__ @ St. Vincent's Institute of Medical Research (SVI) with __interest in statistical computing and visualisation__.
+
+Talk repo at: [https://github.com/kcf-jackson/ecssc-2021-talk/](https://github.com/kcf-jackson/ecssc-2021-talk/)
+
+Feel free to reach me at [jkwok@svi.edu.au](jkwok@svi.edu.au) or via Slack on __ROpenSci__.
+]
+
+.pull-right[
+&lt;img src="lab_photo.jpg"&gt;&lt;/img&gt;
+]
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"ratio": "16:9",
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false,
+"navigation": {
+"scroll": false
+}
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

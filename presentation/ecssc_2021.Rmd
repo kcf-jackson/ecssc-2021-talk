@@ -185,6 +185,8 @@ Geodetic CRS:  WGS 84
 
 <video controls src="./Demo-1.mp4" type="video/mp4" style="height:50vh;"></video>
 
+<!-- <iframe width="728" height="410" src="https://www.youtube.com/embed/0CWcyetOOns" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
+
 
 ---
 
@@ -290,6 +292,7 @@ __We are interested in the dynamics of $X_s(t)$ for $s\in S, t \in \mathbb{N}$ _
 
 <video controls src="./Demo-2.mp4" type="video/mp4" style="height:60vh;"></video>
 
+<!-- <iframe width="840" height="473" src="https://www.youtube.com/embed/5h0fKWj0bqg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
 
 ---
 
@@ -315,6 +318,8 @@ We can sample one street node from each of $s$ and $s'$, and make the agent trav
 ## Demo
 
 <video controls src="./Demo-3.mp4" type="video/mp4" style="height:60vh;"></video>
+
+<!-- <iframe width="840" height="473" src="https://www.youtube.com/embed/rvuHweSQTn8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
 
 
 ---
