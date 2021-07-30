@@ -245,7 +245,7 @@ A street is represented by a sequence of coordinates. To construct a street grap
 
 1. __give each coordinate an unique node ID and add to the node-list__
   - points with the same coordinate should have the same ID
-  - the node-list should have contain duplicate entries
+  - the node-list should have no duplicate entries
 2. __add an edge for every two consecutive nodes__
   - if the street is two-way, then also add the edge for the reverse direction
 ]
